@@ -230,17 +230,17 @@
         layer.deferMoveGriddedTiles = function() {
             log.push("deferMoveGriddedTiles");
             origDeferMoveGriddedTiles.apply(this, arguments);
-        }
+        };
         layer.moveGriddedTiles = function() {
             log.push("moveGriddedTiles");
             OpenLayers.Layer.WMS.prototype.moveGriddedTiles.apply(this, arguments);
-        }
+        };
         map.moveTo([5, 0]);
         t.eq(log[0], "moveGriddedTiles", "deferred after moveTo");
         map.moveTo([0, 0]);
         t.eq(log[1], "moveGriddedTiles", "deferred again after another moveTo");
         t.eq(log.length, 2, "no tiles loaded yet");
-        t.delay_call(0.1, function() {
+        t.delay_call(1, function() {
             t.eq(log[2], "deferMoveGriddedTiles", "tiles moved after tileLoadingDelay");
         });
 
@@ -506,7 +506,7 @@
     }  
      
     function test_Layer_Grid_addTileMonitoringHooks(t) {
-        t.plan(15);
+        t.plan(18);
         
         layer = new OpenLayers.Layer.Grid();
         layer.events = {
@@ -519,6 +519,13 @@
             events: {
                 register: function(name, obj, func) {
                     g_registered[name] = [obj, func];
+                },
+                on: function(obj) {
+                    for (var o in obj) {
+                        if (obj.hasOwnProperty(o)) {
+                            tile.events.register(o, obj.scope, obj[o]);
+                        }
+                    }
                 }
             }
         }
@@ -539,10 +546,11 @@
 
         t.eq(g_events[0][0], "loadstart", "loadstart event triggered when numLoadingTiles is 0");
         t.eq(layer.numLoadingTiles, 1, "numLoadingTiles incremented");
+        t.eq(g_events[1][0], "tileloadstart", "tileloadstart event triggered");
 
         g_events = [];
         tile.onLoadStart.apply(layer);
-        t.eq(g_events.length, 0, "loadstart event not triggered when numLoadingTiles is not 0");
+        t.eq(g_events.length, 1, "tileloadstart, but not loadstart triggered when numLoadingTiles is not 0");
         t.eq(layer.numLoadingTiles, 2, "numLoadingTiles incremented");
 
 
@@ -550,6 +558,11 @@
         t.ok(tile.onLoadEnd != null, "onLoadEnd function created and added to tile");
         entry = g_registered["loadend"];
         t.ok( entry && entry[0] == layer && entry[1] == tile.onLoadEnd, "loadend correctly registered");
+        
+        g_events = [];
+        tile.onLoadError.apply(layer);
+        t.eq(g_events[0][0], "tileerror", "tileerror triggered");
+        t.ok(g_events[0][1].tile === tile, "tile passed as tile property to event object");
         
         layer.numLoadingTiles = 2; 
         g_events = [];
